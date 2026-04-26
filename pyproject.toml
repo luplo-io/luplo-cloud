@@ -1,7 +1,7 @@
 [project]
 name = "luplo-cloud"
-version = "0.1.0"
-description = "CLI for luplo cloud — manage access keys, login, and configure MCP saas backend."
+version = "0.2.0"
+description = "CLI for luplo cloud — manage access keys, login, and configure the luplo MCP backend."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"

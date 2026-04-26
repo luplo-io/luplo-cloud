@@ -18,7 +18,7 @@ Opens a browser to https://app.luplo.io/login and stores tokens in your OS keyri
 
 Issue an access key at https://app.luplo.io/settings/api-keys, then:
 
-    export LUPLO_SAAS_API_KEY=lupk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    export LUPLO_CLOUD_API_KEY=lupk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     lps whoami    # uses the api key, no browser needed
 
 ### MCP setup

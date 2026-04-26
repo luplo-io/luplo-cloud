@@ -4,9 +4,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-DEFAULT_SERVER_URL = os.environ.get("LUPLO_SAAS_SERVER_URL", "https://api.luplo.io")
-DEFAULT_APP_URL = os.environ.get("LUPLO_SAAS_APP_URL", "https://app.luplo.io")
-DEFAULT_API_KEY = os.environ.get("LUPLO_SAAS_API_KEY")
+DEFAULT_SERVER_URL = os.environ.get("LUPLO_CLOUD_SERVER_URL", "https://api.luplo.io")
+DEFAULT_APP_URL = os.environ.get("LUPLO_CLOUD_APP_URL", "https://app.luplo.io")
+DEFAULT_API_KEY = os.environ.get("LUPLO_CLOUD_API_KEY")
 
 
 @dataclass(slots=True, frozen=True)
