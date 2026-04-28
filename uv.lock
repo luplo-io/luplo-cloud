@@ -479,7 +479,7 @@ wheels = [
 
 [[package]]
 name = "luplo"
-version = "0.9.0"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -491,14 +491,14 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/62/d971a89f0959ab30482c9d2e4e82fe07d69869b31f6d57d0147b63514306/luplo-0.9.0.tar.gz", hash = "sha256:9b86263f112f0e8e20bb6167d4ed94e1f1a90548d4fcfd7af1beece869db36d7", size = 322626, upload-time = "2026-04-28T03:36:22.751Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/4b/432b7e6e57fcfab01a182fe497eb7ceca7d3f14b92237e238cfb9e2fb6e4/luplo-0.11.0.tar.gz", hash = "sha256:6338545d031371c3e43160bf9cf166e322acc7533eca100c7c209ff3ed1542cf", size = 318193, upload-time = "2026-04-28T04:59:08.038Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/3b/1edd8b9dd66e29686f6e1849fca8416f66554e1df842e3e9b5cfc550ba7c/luplo-0.9.0-py3-none-any.whl", hash = "sha256:8ae18e8ec50eef2f8706a6669ecf8e901f537bfb46dce7e5bd70dfd91217140a", size = 129536, upload-time = "2026-04-28T03:36:21.19Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/c8/85ade1f71837cde81bada0eec1caefa58c54cebfea4ef0b5821d352d2561/luplo-0.11.0-py3-none-any.whl", hash = "sha256:dd4c7970c8d13b2d4064cbd3ff9dc44fbe71ca90d9ec1880368580fda0b40e08", size = 121974, upload-time = "2026-04-28T04:59:06.661Z" },
 ]
 
 [[package]]
 name = "luplo-cloud"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -520,7 +520,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.28,<0.29" },
     { name = "keyring", specifier = ">=25.0,<26.0" },
-    { name = "luplo", specifier = ">=0.9" },
+    { name = "luplo", specifier = ">=0.11" },
     { name = "typer", specifier = ">=0.12,<1.0" },
 ]
 

@@ -14,6 +14,8 @@ Secret Service). No config files, no long-lived secrets on disk.
 """
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 import typer
 
 from luplo_cloud.commands import init as init_cmd
@@ -22,12 +24,42 @@ from luplo_cloud.commands import logout as logout_cmd
 from luplo_cloud.commands import mcp_config as mcp_config_cmd
 from luplo_cloud.commands import whoami as whoami_cmd
 
+
+def _pkg_version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _version_callback(show: bool) -> None:
+    if not show:
+        return
+    typer.echo(f"luplo-cloud {_pkg_version('luplo-cloud')} (luplo {_pkg_version('luplo')})")
+    raise typer.Exit()
+
+
 app = typer.Typer(
     name="lps",
     help="luplo-cloud CLI adapter.",
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+@app.callback()
+def _root(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show luplo-cloud and bundled luplo versions, then exit.",
+    ),
+) -> None:
+    """luplo-cloud CLI adapter."""
+
 
 app.command("login")(login_cmd.run)
 app.command("logout")(logout_cmd.run)
