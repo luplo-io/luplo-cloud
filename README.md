@@ -27,7 +27,21 @@ privilege by default.
 
 ```bash
 lps login                                # browser opens, OAuth → tokens → keyring
+lps init                                 # pick org + project → writes ./.luplo
 lps mcp-config | tee ~/.claude.json      # or paste into Claude Desktop config
+```
+
+`lps init` creates a `.luplo` TOML file in the current directory binding it to
+a cloud project. The file is safe to commit — it contains only the project id
+and the API base URL, no secrets. Subsequent `lp` invocations in this directory
+will read the binding from `.luplo`.
+
+```bash
+lps init                                  # full picker
+lps init --org <org-id>                   # org locked, project picker
+lps init --org <org-id> --project <id>    # non-interactive, bind existing
+lps init --org <org-id> --new-project foo # non-interactive, create new
+lps init --force                          # overwrite an existing .luplo
 ```
 
 Default Claude config locations:
@@ -74,6 +88,7 @@ claude mcp add --scope user --transport http luplo \
 - `lps login` — browser-based OAuth, tokens stored in OS keyring
 - `lps logout` — revoke the local refresh token + clear keyring
 - `lps whoami` — print the email and actor_id of the authenticated principal
+- `lps init` — write a `.luplo` workspace file in the current directory
 - `lps mcp-config` — emit a `mcpServers` JSON entry; bearer is the API key if
   `LUPLO_CLOUD_API_KEY` is set, otherwise the OAuth token
 

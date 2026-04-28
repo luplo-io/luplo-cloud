@@ -82,6 +82,21 @@ class ApiClient:
         r.raise_for_status()
         return r.json()
 
+    def list_orgs(self) -> list[dict[str, Any]]:
+        r = self.get("/orgs")
+        r.raise_for_status()
+        return r.json()
+
+    def list_projects(self, org_id: str) -> list[dict[str, Any]]:
+        r = self.get(f"/projects?org_id={org_id}")
+        r.raise_for_status()
+        return r.json()
+
+    def create_project(self, org_id: str, name: str) -> dict[str, Any]:
+        r = self.post("/projects", json={"org_id": org_id, "name": name})
+        r.raise_for_status()
+        return r.json()
+
     def logout_remote(self) -> None:
         t = keyring_store.load()
         refresh = t.refresh_token if t else None
