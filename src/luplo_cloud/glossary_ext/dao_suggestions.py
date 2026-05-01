@@ -201,13 +201,18 @@ async def apply_decisions(
                 raise ValueError(
                     f"Suggestion {sid}: 'canonical_replace' requires a reason"
                 )
-            # Demote existing canonical to alias
-            await conn.execute(
-                "UPDATE glossary_terms SET status = 'alias',"
-                "       decided_by = %s, decided_at = now()"
-                " WHERE group_id = %s AND status = 'canonical'",
-                (actor_id, row["target_group_id"]),
-            )
+            # Demote existing canonical to alias, capturing the old surface
+            # for the canonical_changed history row.
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute(
+                    "UPDATE glossary_terms SET status = 'alias',"
+                    "       decided_by = %s, decided_at = now()"
+                    " WHERE group_id = %s AND status = 'canonical'"
+                    " RETURNING surface",
+                    (actor_id, row["target_group_id"]),
+                )
+                demoted = await cur.fetchone()
+            old_canonical = demoted["surface"] if demoted else None
             # Insert new canonical
             term_id = str(uuid.uuid4())
             await conn.execute(
@@ -230,7 +235,7 @@ async def apply_decisions(
                 conn,
                 group_id=row["target_group_id"],
                 action="canonical_changed",
-                old_value=None,
+                old_value={"canonical": old_canonical} if old_canonical else None,
                 new_value={"canonical": row["candidate_surface"]},
                 changed_by=actor_id,
                 reason=reason,
@@ -307,32 +312,27 @@ async def apply_decisions(
             )
         elif decision == "reject":
             if not row["target_group_id"]:
-                # Orphan term reject — write to a synthetic rejection bucket
-                # by skipping (no group to attach to). Treat as skip.
+                # Orphan term reject — no group to attach a rejection row to.
+                # Skip the rejections INSERT and history; consume tail below
+                # marks the suggestion consumed so it doesn't reappear.
+                pass
+            else:
                 await conn.execute(
-                    "UPDATE glossary_suggestions"
-                    " SET reserved_by = NULL, reserved_at = NULL"
-                    " WHERE id = %s",
-                    (sid,),
+                    "INSERT INTO glossary_rejections"
+                    " (group_id, rejected_term, rejected_by, reason)"
+                    " VALUES (%s, %s, %s, %s)"
+                    " ON CONFLICT (group_id, rejected_term) DO NOTHING",
+                    (row["target_group_id"], row["candidate_surface"],
+                     actor_id, d.get("reason")),
                 )
-                summary["reject"] += 1
-                continue
-            await conn.execute(
-                "INSERT INTO glossary_rejections"
-                " (group_id, rejected_term, rejected_by, reason)"
-                " VALUES (%s, %s, %s, %s)"
-                " ON CONFLICT (group_id, rejected_term) DO NOTHING",
-                (row["target_group_id"], row["candidate_surface"],
-                 actor_id, d.get("reason")),
-            )
-            await _record_history(
-                conn,
-                group_id=row["target_group_id"],
-                action="rejection_added",
-                new_value={"rejected_term": row["candidate_surface"]},
-                changed_by=actor_id,
-                reason=d.get("reason"),
-            )
+                await _record_history(
+                    conn,
+                    group_id=row["target_group_id"],
+                    action="rejection_added",
+                    new_value={"rejected_term": row["candidate_surface"]},
+                    changed_by=actor_id,
+                    reason=d.get("reason"),
+                )
 
         # Mark suggestion consumed (skip path already returned)
         await conn.execute(

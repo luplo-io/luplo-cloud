@@ -142,3 +142,192 @@ async def test_apply_decisions_skip_does_not_consume(
         row = await cur.fetchone()
     assert row[0] is None  # not consumed
     assert row[1] is None  # lease released
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_canonical_replace_demotes_and_replaces(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, target_group_id=seed_group,
+        surface="QPS 제한",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{
+            "suggestion_id": sid,
+            "decision": "canonical_replace",
+            "reason": "domain prefers Korean term",
+        }],
+    )
+    assert summary["canonical_replace"] == 1
+    # Old canonical now alias
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT count(*) FROM glossary_terms"
+            " WHERE group_id = %s AND surface = 'rate limit' AND status = 'alias'",
+            (seed_group,),
+        )
+        assert (await cur.fetchone())[0] == 1
+        # New canonical present
+        await cur.execute(
+            "SELECT count(*) FROM glossary_terms"
+            " WHERE group_id = %s AND surface = 'QPS 제한' AND status = 'canonical'",
+            (seed_group,),
+        )
+        assert (await cur.fetchone())[0] == 1
+        # Group canonical updated
+        await cur.execute(
+            "SELECT canonical FROM glossary_groups WHERE id = %s",
+            (seed_group,),
+        )
+        assert (await cur.fetchone())[0] == "QPS 제한"
+        # canonical_changed history captures old value (I-3 fix)
+        await cur.execute(
+            "SELECT old_value, new_value FROM glossary_history"
+            " WHERE group_id = %s AND action = 'canonical_changed'",
+            (seed_group,),
+        )
+        hist = await cur.fetchone()
+    assert hist[0] == {"canonical": "rate limit"}
+    assert hist[1] == {"canonical": "QPS 제한"}
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_canonical_replace_requires_reason(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, target_group_id=seed_group,
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    with pytest.raises(ValueError, match="reason"):
+        await apply_decisions(
+            oss_conn, actor_id=seed_actor,
+            decisions=[{"suggestion_id": sid, "decision": "canonical_replace"}],
+        )
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_alias_requires_target_group_id(
+    oss_conn, seed_project, seed_actor,
+):
+    # Seed a suggestion WITHOUT target_group_id (kind='term')
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, kind="term",
+        target_group_id=None, surface="orphan",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    with pytest.raises(ValueError, match="target_group_id"):
+        await apply_decisions(
+            oss_conn, actor_id=seed_actor,
+            decisions=[{"suggestion_id": sid, "decision": "alias"}],
+        )
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_sibling_creates_group_term_and_relation(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, target_group_id=seed_group,
+        surface="throttling",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{"suggestion_id": sid, "decision": "sibling"}],
+    )
+    assert summary["sibling"] == 1
+    async with oss_conn.cursor() as cur:
+        # New group exists
+        await cur.execute(
+            "SELECT id FROM glossary_groups"
+            " WHERE project_id = %s AND canonical = 'throttling'",
+            (seed_project,),
+        )
+        new_group = await cur.fetchone()
+        assert new_group is not None
+        # Sibling relation row exists between seed_group and new_group
+        await cur.execute(
+            "SELECT count(*) FROM glossary_group_relations"
+            " WHERE relation = 'sibling'"
+            "   AND ((group_a_id = %s AND group_b_id = %s)"
+            "     OR (group_a_id = %s AND group_b_id = %s))",
+            (seed_group, new_group[0], new_group[0], seed_group),
+        )
+        assert (await cur.fetchone())[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_create_uses_new_canonical_override(
+    oss_conn, seed_project, seed_actor,
+):
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, kind="term",
+        target_group_id=None, surface="raw_surface",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{
+            "suggestion_id": sid, "decision": "create",
+            "new_canonical": "Polished Surface",
+        }],
+    )
+    assert summary["create"] == 1
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT canonical FROM glossary_groups"
+            " WHERE project_id = %s AND canonical = 'Polished Surface'",
+            (seed_project,),
+        )
+        assert (await cur.fetchone())[0] == "Polished Surface"
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_reject_writes_rejection_row(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, target_group_id=seed_group,
+        surface="not-a-thing",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{"suggestion_id": sid, "decision": "reject", "reason": "irrelevant"}],
+    )
+    assert summary["reject"] == 1
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT count(*) FROM glossary_rejections"
+            " WHERE group_id = %s AND rejected_term = 'not-a-thing'",
+            (seed_group,),
+        )
+        assert (await cur.fetchone())[0] == 1
+        # Suggestion consumed
+        await cur.execute(
+            "SELECT consumed_decision FROM glossary_suggestions WHERE id = %s",
+            (sid,),
+        )
+        assert (await cur.fetchone())[0] == "reject"
