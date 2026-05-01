@@ -36,6 +36,9 @@ if not _raw_url:
 _url = make_url(_raw_url)
 if _url.drivername in ("postgresql", "postgres"):
     _url = _url.set(drivername="postgresql+asyncpg")
+# Strip libpq-style query options (e.g. ?sslmode=require) — asyncpg rejects them.
+if _url.query:
+    _url = _url.set(query={})
 config.set_main_option("sqlalchemy.url", _url.render_as_string(hide_password=False))
 
 target_metadata = None  # raw SQL migrations only
