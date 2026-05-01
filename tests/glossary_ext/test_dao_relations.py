@@ -54,3 +54,15 @@ async def test_add_relation_dedupes(
         relation="sibling", registered_by=seed_actor,
     )
     assert r1 == r2
+
+
+@pytest.mark.asyncio
+async def test_add_relation_rejects_self_relation(
+    oss_conn, seed_project, seed_actor, seed_group
+):
+    with pytest.raises(ValueError, match="itself"):
+        await add_relation(
+            oss_conn, project_id=seed_project,
+            group_x_id=seed_group, group_y_id=seed_group,
+            relation="sibling", registered_by=seed_actor,
+        )
