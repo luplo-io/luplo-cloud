@@ -59,10 +59,10 @@ async def seed_project(oss_conn: psycopg.AsyncConnection[Any]) -> str:
 
 @pytest_asyncio.fixture
 async def seed_actor(oss_conn: psycopg.AsyncConnection[Any]) -> str:
-    aid = f"actor-{uuid.uuid4().hex[:8]}"
+    aid = str(uuid.uuid4())
     await oss_conn.execute(
-        "INSERT INTO actors (id, name) VALUES (%s, %s)",
-        (aid, f"Test Actor {aid}"),
+        "INSERT INTO actors (id, name, email) VALUES (%s, %s, %s)",
+        (aid, f"Test Actor {aid[:8]}", f"{aid}@test.local"),
     )
     return aid
 
