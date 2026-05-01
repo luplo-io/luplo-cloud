@@ -37,30 +37,32 @@ async def upsert_embedding(
     The `::vector` cast tolerates NULL natively in Postgres so we use a
     single code path regardless of whether the embedding has been
     computed yet.
+
+    Surface is overwritten on conflict (latest-write-wins for display);
+    vector is preserved when the new value is NULL (workers fill it in
+    asynchronously after metadata is upserted).
     """
     eid = str(uuid.uuid4())
-    await conn.execute(
-        "INSERT INTO glossary_term_embeddings"
-        " (id, project_id, surface, normalized, model_id, vector, linked_term_id)"
-        " VALUES (%(id)s, %(p)s, %(s)s, %(n)s, %(m)s, %(v)s::vector, %(t)s)"
-        " ON CONFLICT (project_id, normalized, model_id) DO UPDATE"
-        " SET surface = EXCLUDED.surface,"
-        "     vector = COALESCE(EXCLUDED.vector, glossary_term_embeddings.vector),"
-        "     linked_term_id = EXCLUDED.linked_term_id",
-        {
-            "id": eid, "p": project_id, "s": surface, "n": normalized,
-            "m": model_id, "v": _vec_literal(vector), "t": linked_term_id,
-        },
-    )
-
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
-            "SELECT id FROM glossary_term_embeddings"
-            " WHERE project_id = %(p)s AND normalized = %(n)s AND model_id = %(m)s",
-            {"p": project_id, "n": normalized, "m": model_id},
+            "INSERT INTO glossary_term_embeddings"
+            " (id, project_id, surface, normalized, model_id, vector, linked_term_id)"
+            " VALUES (%(id)s, %(p)s, %(s)s, %(n)s, %(m)s, %(v)s::vector, %(t)s)"
+            " ON CONFLICT (project_id, normalized, model_id) DO UPDATE"
+            " SET surface = EXCLUDED.surface,"
+            "     vector = COALESCE(EXCLUDED.vector, glossary_term_embeddings.vector),"
+            "     linked_term_id = EXCLUDED.linked_term_id"
+            " RETURNING id",
+            {
+                "id": eid, "p": project_id, "s": surface, "n": normalized,
+                "m": model_id, "v": _vec_literal(vector), "t": linked_term_id,
+            },
         )
         row = await cur.fetchone()
-        assert row is not None
+        if row is None:
+            raise RuntimeError(
+                "upsert returned no id — schema drift or constraint mismatch"
+            )
         return row["id"]
 
 
