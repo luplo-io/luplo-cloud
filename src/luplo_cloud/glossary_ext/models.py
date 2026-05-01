@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    Double,
     ForeignKey,
     Integer,
     Text,
@@ -107,7 +108,7 @@ class GlossarySuggestion(GlossaryExtBase):
     target_group_id: Mapped[str | None] = mapped_column(
         Text, ForeignKey("glossary_groups.id")
     )
-    similarity: Mapped[float | None] = mapped_column()
+    similarity: Mapped[float | None] = mapped_column(Double)
     source_item_id: Mapped[str | None] = mapped_column(
         Text, ForeignKey("items.id")
     )
@@ -122,6 +123,17 @@ class GlossarySuggestion(GlossaryExtBase):
     reserved_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     consumed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     consumed_decision: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('pair','term')",
+            name="glossary_suggestions_kind_check",
+        ),
+        CheckConstraint(
+            "consumed_decision IN ('alias','canonical_replace','sibling','create','reject')",
+            name="glossary_suggestions_consumed_decision_check",
+        ),
+    )
 
 
 class GlossaryGroupRelation(GlossaryExtBase):
@@ -152,6 +164,10 @@ class GlossaryGroupRelation(GlossaryExtBase):
             "group_a_id", "group_b_id", "relation",
             name="uq_group_relation_pair",
         ),
+        CheckConstraint(
+            "relation IN ('sibling','related')",
+            name="glossary_group_relations_relation_check",
+        ),
     )
 
 
@@ -172,3 +188,11 @@ class GlossaryHistory(GlossaryExtBase):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     reason: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('group_created','canonical_changed','term_added',"
+            "'sibling_added','rejection_added','suggestion_consumed')",
+            name="glossary_history_action_check",
+        ),
+    )
