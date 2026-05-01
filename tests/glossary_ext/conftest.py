@@ -24,7 +24,7 @@ def _resolve_test_db_url() -> str:
     return (
         os.environ.get("LUPLO_EXT_TEST_DB_URL")
         or os.environ.get("LUPLO_TEST_DB_URL")
-        or "postgresql://luplo:luplo@localhost:5433/luplo_test"
+        or "postgresql://postgres:localdb@localhost:5433/luplo_test"
     )
 
 
