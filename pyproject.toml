@@ -1,6 +1,6 @@
 [project]
 name = "luplo-cloud"
-version = "0.6.1"
+version = "0.7.0"
 description = "CLI for luplo cloud — bundles `luplo` (lp) and adds `lps` for cloud auth, key management, and MCP wiring."
 readme = "README.md"
 license = {text = "MIT"}
@@ -36,6 +36,8 @@ Issues = "https://github.com/luplo-io/luplo-cloud/issues"
 
 [project.scripts]
 lps = "luplo_cloud.main:app"
+lps-ext-bootstrap = "luplo_cloud.glossary_ext._alembic_runner:bootstrap"
+lps-ext-migrate = "luplo_cloud.glossary_ext._alembic_runner:migrate"
 
 [dependency-groups]
 dev = [
@@ -52,6 +54,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/luplo_cloud"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"alembic_luplo_ext" = "alembic_luplo_ext"
+"alembic_luplo_ext.ini" = "alembic_luplo_ext.ini"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
