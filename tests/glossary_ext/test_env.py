@@ -9,13 +9,16 @@ def test_env_py_targets_luplo_ext_version_table():
     assert "LUPLO_DB_URL" in text or "LUPLO_EXT_DB_URL" in text
 
 
-def test_env_py_strips_libpq_query_options():
-    """asyncpg rejects libpq-style query params (e.g. ?sslmode=require);
-    env.py must clear the URL query alongside the drivername coercion.
+def test_env_py_uses_sync_psycopg_driver():
+    """env.py uses sync psycopg3 (matches `lp migrate`'s libpq path so
+    sslmode + tailnet hostnames work in prod). Async asyncpg was tried
+    earlier but couldn't resolve the OSS DB hostname from the fly
+    container during start.sh.
     """
     env_path = Path(__file__).resolve().parents[2] / "alembic_luplo_ext" / "env.py"
     text = env_path.read_text(encoding="utf-8")
-    assert "query={}" in text, (
-        "env.py must clear the URL query dict so libpq-style options "
-        "(e.g. ?sslmode=require) don't reach asyncpg"
-    )
+    assert 'drivername="postgresql+psycopg"' in text
+    # The async engine is gone; raw SQL migrations don't need it and
+    # asyncpg's DSN/SSL/DNS path doesn't survive the prod tailnet path.
+    assert "async_engine_from_config" not in text
+    assert "from sqlalchemy.ext.asyncio" not in text
