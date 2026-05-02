@@ -503,7 +503,7 @@ wheels = [
 
 [[package]]
 name = "luplo"
-version = "0.11.1"
+version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -515,9 +515,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/c3/82ad91bce3c89fa45392afab1ef055d79474beb8d648aee9e8cdf1d5ac13/luplo-0.11.1.tar.gz", hash = "sha256:6c52d60b69d40d4f20a4b08e1ba30cdf2aaa458c10132cd80e3c86fb136c50db", size = 319463, upload-time = "2026-04-28T05:12:39.531Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/79/c8dd196dc60396a99a6faacf58f497d935e55e325d4e0dda5710e8c7cffa/luplo-0.13.0.tar.gz", hash = "sha256:53af3e1e52f034002b7c3e13b23f885e1201a5ead05fd36791b9b0de60740688", size = 357649, upload-time = "2026-04-30T10:35:45.9Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/5f/302f181a9e0281505bf218cbf34edea02d0c22cd3a82911c8afd063f1076/luplo-0.11.1-py3-none-any.whl", hash = "sha256:6a427b0296818f2b950dee136e2e3b68fa110a5ca98d9851516eda7c46bf135d", size = 122399, upload-time = "2026-04-28T05:12:38.133Z" },
+    { url = "https://files.pythonhosted.org/packages/11/31/ebd23647fd3584b7d5a8d2add99c554a0c97684c2d31cae5012fbb5a0861/luplo-0.13.0-py3-none-any.whl", hash = "sha256:be3ea8bf32ed741eb46601a6e72cb754d2b2d8ec5e8162a62346014fdeba58eb", size = 155380, upload-time = "2026-04-30T10:35:44.222Z" },
 ]
 
 [[package]]
@@ -553,7 +553,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.30,<0.31" },
     { name = "httpx", specifier = ">=0.28,<0.29" },
     { name = "keyring", specifier = ">=25.0,<26.0" },
-    { name = "luplo", specifier = ">=0.11.1" },
+    { name = "luplo", specifier = ">=0.13.0" },
     { name = "pgvector", specifier = ">=0.3,<1.0" },
     { name = "prompt-toolkit", specifier = ">=3.0,<4.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4.0" },
