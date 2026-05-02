@@ -26,8 +26,14 @@ async def add_relation(
     relation: str,
     registered_by: str | None,
     reason: str | None = None,
-) -> str:
-    """Add a relation between two groups. Returns row id (existing if duplicate)."""
+) -> tuple[str, bool]:
+    """Add a relation between two groups.
+
+    Returns ``(row_id, was_inserted)`` — ``was_inserted`` is True iff this
+    call actually inserted a new row (the ``RETURNING id`` path). On
+    conflict it falls back to the existing id with ``was_inserted=False``,
+    so callers can decide whether to record audit/history side-effects.
+    """
     if group_x_id == group_y_id:
         raise ValueError("Cannot relate a group to itself")
     a, b = (group_x_id, group_y_id) if group_x_id < group_y_id else (group_y_id, group_x_id)
@@ -47,7 +53,7 @@ async def add_relation(
         )
         row = await cur.fetchone()
         if row is not None:
-            return row["id"]
+            return row["id"], True
 
         # Conflict fired — fetch existing id.
         await cur.execute(
@@ -60,7 +66,7 @@ async def add_relation(
             raise RuntimeError(
                 "ON CONFLICT fired but no matching row found — schema drift?"
             )
-        return existing["id"]
+        return existing["id"], False
 
 
 async def list_relations_for_group(

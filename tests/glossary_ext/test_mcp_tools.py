@@ -92,3 +92,69 @@ async def test_glossary_link_sibling_creates_relation(
         reason="adjacent concepts",
     )
     assert res["added"] is True
+
+
+@pytest.mark.asyncio
+async def test_glossary_link_sibling_idempotent_history(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    """Repeat sibling-link calls must not append duplicate history rows."""
+    other_id = f"grp-{uuid.uuid4().hex[:8]}"
+    await oss_conn.execute(
+        "INSERT INTO glossary_groups (id, project_id, scope, canonical, created_by)"
+        " VALUES (%s, %s, 'project', %s, %s)",
+        (other_id, seed_project, "throttling", seed_actor),
+    )
+    res1 = await glossary_link_sibling(
+        oss_conn,
+        project_id=seed_project,
+        group_x_id=seed_group,
+        group_y_id=other_id,
+        actor_id=seed_actor,
+        reason="adjacent concepts",
+    )
+    res2 = await glossary_link_sibling(
+        oss_conn,
+        project_id=seed_project,
+        group_x_id=seed_group,
+        group_y_id=other_id,
+        actor_id=seed_actor,
+        reason="adjacent concepts",
+    )
+    assert res1["added"] is True
+    assert res2["added"] is False
+    assert res1["relation_id"] == res2["relation_id"]
+    # exactly one sibling_added history row for the pair
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT count(*) FROM glossary_history"
+            " WHERE group_id = %s AND action = 'sibling_added'"
+            "   AND new_value->>'sibling_group_id' = %s",
+            (seed_group, other_id),
+        )
+        assert (await cur.fetchone())[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_glossary_add_group_resolves_canonical_case_insensitively(
+    oss_conn, seed_project, seed_actor,
+):
+    """A canonical that differs only in case must resolve to the existing group."""
+    # seed an existing group with a mixed-case canonical
+    res1 = await glossary_add_group(
+        oss_conn,
+        project_id=seed_project,
+        canonical="Auth Token",
+        actor_id=seed_actor,
+    )
+    assert res1["created"] is True
+
+    # caller asks for the same concept in a different case
+    res2 = await glossary_add_group(
+        oss_conn,
+        project_id=seed_project,
+        canonical="auth token",
+        actor_id=seed_actor,
+    )
+    assert res2["created"] is False
+    assert res2["group_id"] == res1["group_id"]

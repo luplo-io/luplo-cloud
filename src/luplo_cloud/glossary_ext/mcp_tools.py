@@ -26,8 +26,15 @@ async def _resolve_group(
         row = await cur.fetchone()
         if row:
             return row[0]
+        # Canonical lookup is case-insensitive so "Auth Token" and
+        # "auth token" resolve to the same group (avoids silent dupes
+        # when a caller varies casing). The id-lookup branch above
+        # remains case-sensitive — UUIDs are case-sensitive.
         params: dict[str, Any] = {"c": canonical_or_id}
-        sql_text = "SELECT id FROM glossary_groups WHERE canonical = %(c)s"
+        sql_text = (
+            "SELECT id FROM glossary_groups"
+            " WHERE LOWER(canonical) = LOWER(%(c)s)"
+        )
         if project_id:
             sql_text += " AND project_id = %(p)s"
             params["p"] = project_id
@@ -134,7 +141,7 @@ async def glossary_link_sibling(
     actor_id: str,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    rid = await add_relation(
+    rid, was_inserted = await add_relation(
         conn,
         project_id=project_id,
         group_x_id=group_x_id,
@@ -143,9 +150,13 @@ async def glossary_link_sibling(
         registered_by=actor_id,
         reason=reason,
     )
-    await record_history(
-        conn, group_id=group_x_id, action="sibling_added",
-        new_value={"sibling_group_id": group_y_id, "relation_id": rid},
-        changed_by=actor_id, reason=reason,
-    )
-    return {"added": True, "relation_id": rid}
+    # Only emit history on the actual insert — repeat calls are a no-op
+    # (the DB-level UNIQUE makes add_relation idempotent, so the history
+    # row would otherwise grow without bound on retries).
+    if was_inserted:
+        await record_history(
+            conn, group_id=group_x_id, action="sibling_added",
+            new_value={"sibling_group_id": group_y_id, "relation_id": rid},
+            changed_by=actor_id, reason=reason,
+        )
+    return {"added": was_inserted, "relation_id": rid}
