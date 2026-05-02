@@ -331,3 +331,122 @@ async def test_apply_decisions_reject_writes_rejection_row(
             (sid,),
         )
         assert (await cur.fetchone())[0] == "reject"
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_pair_create_records_one_suggestion_consumed(
+    oss_conn, seed_project, seed_actor, seed_group,
+):
+    """Fix A: kind='pair' create must record exactly ONE suggestion_consumed
+    history row, on the new group (not the original target group).
+
+    Before fix: the create branch and the tail both wrote suggestion_consumed
+    for kind='pair' (where target_group_id is set), giving two rows.
+    """
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, target_group_id=seed_group,
+        surface="brand_new_concept",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{"suggestion_id": sid, "decision": "create"}],
+    )
+    assert summary["create"] == 1
+    async with oss_conn.cursor() as cur:
+        # Exactly one suggestion_consumed history row for this suggestion.
+        await cur.execute(
+            "SELECT group_id FROM glossary_history"
+            " WHERE action = 'suggestion_consumed'"
+            "   AND new_value->>'suggestion_id' = %s",
+            (sid,),
+        )
+        rows = await cur.fetchall()
+    assert len(rows) == 1, (
+        f"expected 1 suggestion_consumed row for sid={sid}, got {len(rows)}"
+    )
+    # The single row must be on the newly-created group, NOT the original
+    # target group (the create branch's affected group is the new group).
+    assert rows[0][0] != seed_group, (
+        "suggestion_consumed should be on the new group, not the original target"
+    )
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_term_create_records_one_suggestion_consumed(
+    oss_conn, seed_project, seed_actor,
+):
+    """Fix A regression guard: kind='term' create still records exactly one
+    suggestion_consumed (on the new group)."""
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, kind="term",
+        target_group_id=None, surface="standalone_term",
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{"suggestion_id": sid, "decision": "create"}],
+    )
+    assert summary["create"] == 1
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT group_id FROM glossary_history"
+            " WHERE action = 'suggestion_consumed'"
+            "   AND new_value->>'suggestion_id' = %s",
+            (sid,),
+        )
+        rows = await cur.fetchall()
+    assert len(rows) == 1, (
+        f"expected 1 suggestion_consumed row for sid={sid}, got {len(rows)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_apply_decisions_orphan_term_reject_consumes_for_dedupe(
+    oss_conn, seed_project, seed_actor,
+):
+    """Fix C: kind='term' (orphan) reject consumes the suggestion so the
+    worker can dedup against (project_id, candidate_normalized).
+
+    glossary_rejections requires NOT NULL group_id, so we cannot write a
+    rejection row. The consumed glossary_suggestions row IS the dedup record.
+    """
+    surface = "bogus_term"
+    sid = await _seed_suggestion(
+        oss_conn, project_id=seed_project, kind="term",
+        target_group_id=None, surface=surface,
+    )
+    await lease_suggestions(
+        oss_conn, project_id=seed_project, leased_by=seed_actor,
+        limit=10, stale_after_minutes=30,
+    )
+    summary = await apply_decisions(
+        oss_conn, actor_id=seed_actor,
+        decisions=[{"suggestion_id": sid, "decision": "reject", "reason": "noise"}],
+    )
+    assert summary["reject"] == 1
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT consumed_at, consumed_decision FROM glossary_suggestions"
+            " WHERE id = %s",
+            (sid,),
+        )
+        row = await cur.fetchone()
+    assert row[0] is not None
+    assert row[1] == "reject"
+
+    # Worker-style dedup query: any consumed row for this (project, normalized)?
+    async with oss_conn.cursor() as cur:
+        await cur.execute(
+            "SELECT count(*) FROM glossary_suggestions"
+            " WHERE project_id = %s AND candidate_normalized = %s"
+            "   AND consumed_at IS NOT NULL",
+            (seed_project, surface.lower()),
+        )
+        assert (await cur.fetchone())[0] == 1

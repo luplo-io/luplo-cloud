@@ -176,6 +176,11 @@ async def apply_decisions(
             summary["skip"] += 1
             continue
 
+        # Each branch sets `affected_group_id` — the group on which the
+        # tail-end suggestion_consumed history event should be audited.
+        # None means the tail skips (orphan term reject — see Fix C).
+        affected_group_id: str | None = None
+
         if decision == "alias":
             if not row["target_group_id"]:
                 raise ValueError(
@@ -191,6 +196,7 @@ async def apply_decisions(
                  row["candidate_surface"], row["candidate_normalized"],
                  row["source_item_id"], row["context_snippet"], actor_id),
             )
+            affected_group_id = row["target_group_id"]
         elif decision == "canonical_replace":
             if not row["target_group_id"]:
                 raise ValueError(
@@ -240,6 +246,7 @@ async def apply_decisions(
                 changed_by=actor_id,
                 reason=reason,
             )
+            affected_group_id = row["target_group_id"]
         elif decision == "sibling":
             if not row["target_group_id"]:
                 raise ValueError(
@@ -280,6 +287,7 @@ async def apply_decisions(
                 changed_by=actor_id,
                 reason=d.get("reason"),
             )
+            affected_group_id = row["target_group_id"]
         elif decision == "create":
             new_group_id = str(uuid.uuid4())
             canonical = d.get("new_canonical") or row["candidate_surface"]
@@ -302,20 +310,16 @@ async def apply_decisions(
                 new_value={"canonical": canonical},
                 changed_by=actor_id,
             )
-            # Audit link: this new group originated from a suggestion.
-            await _record_history(
-                conn,
-                group_id=new_group_id,
-                action="suggestion_consumed",
-                new_value={"suggestion_id": sid, "decision": decision},
-                changed_by=actor_id,
-            )
+            # Audit link belongs on the new group, not the (possibly-set)
+            # target_group_id from the suggestion. The tail below handles it.
+            affected_group_id = new_group_id
         elif decision == "reject":
             if not row["target_group_id"]:
-                # Orphan term reject — no group to attach a rejection row to.
-                # Skip the rejections INSERT and history; consume tail below
-                # marks the suggestion consumed so it doesn't reappear.
-                pass
+                # Orphan term reject — `glossary_rejections` requires NOT NULL
+                # `group_id`. The consumed suggestion row itself is the
+                # rejection record; SEAM contract requires workers to dedup
+                # against consumed rows. See docs/SEAM-glossary-ext.md.
+                affected_group_id = None
             else:
                 await conn.execute(
                     "INSERT INTO glossary_rejections"
@@ -333,6 +337,7 @@ async def apply_decisions(
                     changed_by=actor_id,
                     reason=d.get("reason"),
                 )
+                affected_group_id = row["target_group_id"]
 
         # Mark suggestion consumed (skip path already returned)
         await conn.execute(
@@ -341,10 +346,10 @@ async def apply_decisions(
             " WHERE id = %s",
             (decision, sid),
         )
-        if row["target_group_id"]:
+        if affected_group_id is not None:
             await _record_history(
                 conn,
-                group_id=row["target_group_id"],
+                group_id=affected_group_id,
                 action="suggestion_consumed",
                 new_value={"suggestion_id": sid, "decision": decision},
                 changed_by=actor_id,

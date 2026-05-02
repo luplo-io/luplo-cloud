@@ -80,7 +80,11 @@ Indexes:
    - `ts_stat` frequency floor (configurable)
    - dedupe against `glossary_terms WHERE status IN ('canonical','alias')`
    - dedupe against `glossary_rejections`
-   - existing rows in `glossary_suggestions` for same project + normalized
+   - existing rows in `glossary_suggestions` for same `(project_id,
+     candidate_normalized)`, **including consumed-rejected rows** —
+     workers MUST NOT re-suggest a normalized term that has any prior
+     consumed row for this project, since orphan term rejects
+     (`target_group_id` NULL) cannot write to `glossary_rejections`.
 3. For each surviving candidate, enqueue `glossary.embed` job.
 4. For `glossary.embed`: call OpenRouter `baai/bge-m3`, upsert
    `glossary_term_embeddings`, then compute pgvector cosine against the
