@@ -8,7 +8,7 @@ wiring. After installing this package you have two binaries:
 | Binary | Source       | Role |
 |--------|--------------|------|
 | **`lp`**  | `luplo`        | The luplo CLI / stdio MCP server. Talks to local Postgres by default, or — when `.luplo` declares `type = "remote"` — through the hosted cloud HTTP API. 23 MCP tools. |
-| **`lps`** | `luplo-cloud`  | Cloud-only commands: `login`, `logout`, `whoami`, `init`, `mcp-config`. |
+| **`lps`** | `luplo-cloud`  | Cloud-only commands: `login`, `logout`, `whoami`, `init`, `mcp-config`, `glossary suggest`. |
 
 ## Install
 
