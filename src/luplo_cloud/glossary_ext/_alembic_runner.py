@@ -37,4 +37,12 @@ def migrate() -> int:
         print("[lps-ext-migrate] LUPLO_EXT_DB_URL/LUPLO_DB_URL must be set",
               file=sys.stderr)
         return 1
-    return subprocess.call(["alembic", "-c", _ini_path(), "upgrade", "head"])
+    ini = _ini_path()
+    # The .ini's `script_location = alembic_luplo_ext` is relative; alembic
+    # resolves it from CWD, not from the .ini's directory. Run alembic with
+    # CWD pinned to where the bundled `alembic_luplo_ext/` package lives
+    # (alongside the .ini at site-packages root).
+    return subprocess.call(
+        ["alembic", "-c", ini, "upgrade", "head"],
+        cwd=str(Path(ini).parent),
+    )
