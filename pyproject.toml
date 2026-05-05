@@ -1,6 +1,6 @@
 [project]
 name = "luplo-cloud"
-version = "0.7.2"
+version = "0.7.3"
 description = "CLI for luplo cloud — bundles `luplo` (lp) and adds `lps` for cloud auth, key management, and MCP wiring."
 readme = "README.md"
 license = {text = "MIT"}
