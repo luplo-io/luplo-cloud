@@ -1,6 +1,6 @@
 [project]
 name = "luplo-cloud"
-version = "0.8.0"
+version = "0.8.1"
 description = "CLI for luplo cloud — bundles `luplo` (lp) and adds `lps` for cloud auth, key management, and MCP wiring."
 readme = "README.md"
 license = {text = "MIT"}
@@ -19,7 +19,7 @@ dependencies = [
     "typer>=0.12,<1.0",
     "httpx>=0.28,<0.29",
     "keyring>=25.0,<26.0",
-    "luplo>=0.13.0",
+    "luplo>=0.14.1",
 ]
 
 [project.urls]
