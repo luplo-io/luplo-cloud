@@ -68,13 +68,5 @@ app.command("init")(init_cmd.run)
 app.command("mcp-config")(mcp_config_cmd.run)
 
 
-# Glossary recommendation queue — only registered when extras installed.
-try:
-    from luplo_cloud.commands.glossary import attach as _attach_glossary
-    _attach_glossary(app)
-except ImportError:
-    pass
-
-
 if __name__ == "__main__":  # pragma: no cover
     app()
